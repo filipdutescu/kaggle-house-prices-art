@@ -1,0 +1,40 @@
+grade = OverallQual / OverallCond
+unfinisheed garage percentage? corr ~ .1 => statistically insignifiant
+
+time from renov to selling
+time from built to selling
+
+tot surface? 1stfl + 2ndfl + bsmt?
+TotalSF          0.773672
+
+Grade corr w/ OverallQual is -0.772025, w/ OverallCond 0.714707
+Age corr w/ YrSold 0.046370, w/ YearBuilt -0.999086
+RemodAge corr w/ YrSold 0.026074, w/ YearRemodAdd -0.997967
+
+percentage of basement unfinished
+
+Garage important?
+
+Baths
+
+OverallQual     0.795437
+GrLivArea       0.707481
+GarageCars      0.652103
+GarageArea      0.620772
+TotalBsmtSF     0.617741
+1stFlrSF        0.617692
+FullBath        0.578299
+TotRmsAbvGrd    0.560521
+YearBuilt       0.523434
+YearRemodAdd    0.519806
+GarageYrBlt     0.502248
+
+=========================
+
+OverallQual     0.795437
+Grade          -0.555453
+YearBuilt       0.523434
+Age            -0.523162
+YearRemodAdd    0.519806
+RemodAge       -0.520427
+
