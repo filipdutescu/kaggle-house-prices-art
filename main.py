@@ -5,7 +5,7 @@ from matplotlib import ticker as tick
 
 
 # Plot correlations
-def corr_plot(data :pd.DataFrame, feature :str, threshold=0.5, y_lower_scale=True, same_fig=True, fig_size=(3, 4)):
+def corr_plot(data :pd.DataFrame, feature :str, threshold=0.5, plot_type :str = 'scatter', y_lower_scale=True, same_fig=True, fig_size=(3, 4)):
     fig = plt.figure()
     corr_matrix = data.corr()
     i = 1
@@ -13,14 +13,20 @@ def corr_plot(data :pd.DataFrame, feature :str, threshold=0.5, y_lower_scale=Tru
         if abs(corr_matrix[feat][feature]) > threshold and feat != feature:
             if same_fig == True:
                 ax = fig.add_subplot(fig_size[0], fig_size[1], i)
-                ax.scatter(x=feat, y=feature, data=data)
+                if plot_type == 'scatter':
+                    ax.scatter(x=feat, y=feature, data=data)
+                elif plot_type == 'hist':
+                    ax.hist(x=feat, data=data)
                 ax.set_xlabel(feat)
                 if y_lower_scale == True:
                     ax.yaxis.set_major_formatter(tick.FormatStrFormatter('%.e'))
                 plt.yticks(rotation=45)
                 i = i + 1
             else:
-                plt.scatter(x=feat, y=feature, data=data)
+                if plot_type == 'scatter':
+                    plt.scatter(x=feat, y=feature, data=data)
+                elif plot_type == 'hist':
+                    plt.hist(x=feat, data=data)
                 plt.xlabel(feat)
                 plt.show()
 
@@ -77,6 +83,9 @@ def main():
 
 #    corr_plot(raw_data, 'SalePrice', fig_size=(4, 4))
 #    corr_plot(raw_data, 'SalePrice', y_lower_scale=False, same_fig=False)
+#    plt.hist(x=raw_data['SalePrice'])
+#    plt.show()
+#    corr_plot(raw_data, 'SalePrice', plot_type='hist', y_lower_scale=False, same_fig=False)
 
     
 if __name__ == '__main__':
