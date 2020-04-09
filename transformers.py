@@ -3,7 +3,7 @@ import numpy as np
 
 
 class FeatureCreator(BaseEstimator, TransformerMixin):
-    def __init__(self, features :'list of strings', operation :lambda, as_dataframe = False, feat_name = 'NewFeature'):
+    def __init__(self, features :'list of strings', operation, as_dataframe :bool = False, feat_name :str = 'NewFeature'):
         self.features = features
         self.operation = operation
         self.as_dataframe = as_dataframe
@@ -16,7 +16,7 @@ class FeatureCreator(BaseEstimator, TransformerMixin):
         no_feat = len(self.features)
         prev_feat = self.features[0]
         for i in range(1, no_feat):
-            new_feature = self.operation(prev_feat, X[self.features[i]])
+            new_feature = self.operation(X[prev_feat], X[self.features[i]])
             prev_feat = self.features[i]
 
         if self.as_dataframe:

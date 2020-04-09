@@ -1,5 +1,5 @@
 grade = OverallQual / OverallCond
-unfinisheed garage percentage? corr ~ .1 => statistically insignifiant
+unfinished garage percentage? corr ~ .1 => statistically insignifiant
 
 time from renov to selling
 time from built to selling
@@ -15,7 +15,7 @@ percentage of basement unfinished
 
 Garage important?
 
-Baths
+Baths fullbath between [0, 3.5]?
 
 OverallQual     0.795437
 GrLivArea       0.707481

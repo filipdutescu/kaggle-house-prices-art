@@ -3,6 +3,10 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import ticker as tick
 
+import transformers as trans
+
+from sklearn.pipeline import Pipeline 
+
 
 # Plot correlations
 def corr_plot(data :pd.DataFrame, feature :str, threshold=0.5, plot_type :str = 'scatter', y_lower_scale=True, same_fig=True, fig_size=(3, 4)):
@@ -67,12 +71,16 @@ def main():
     #    print(non_numeric_cols[col].value_counts())
     #    input()
 
-    raw_data['Grade'] = raw_data['OverallCond'] / raw_data['OverallQual']
-    raw_data['Age'] = raw_data['YrSold'] - raw_data['YearBuilt']
-    raw_data['RemodAge'] = raw_data['YrSold'] - raw_data['YearRemodAdd']
     #raw_data.drop(columns=[ 'YearBuilt', 'YearRemodAdd' ], inplace=True)
     #raw_data['PercUnfBsmt'] = raw_data['BsmtUnfSF'] / raw_data['TotalBsmtSF'] 
-    raw_data['TotalSF'] = raw_data['TotalBsmtSF'] + raw_data['1stFlrSF'] + raw_data['2ndFlrSF']
+
+    new_feat_pipeline = Pipeline([
+            ('Grade', trans.FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
+            ('Age', trans.FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
+            ('RemodAge', trans.FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
+            ('TotalSF', trans.FeatureCreator(['TotalBsmtSF', '1stFlrSF', '2ndFlrSF'], lambda x,y: x + y, as_dataframe=True, feat_name='TotalSF')),
+            ]) 
+    raw_data = new_feat_pipeline.fit_transform(raw_data)
 
     corr_matrix = raw_data.corr()
     sale_correl = corr_matrix['SalePrice'].sort_values(ascending=False)
@@ -83,9 +91,9 @@ def main():
 
 #    corr_plot(raw_data, 'SalePrice', fig_size=(4, 4))
 #    corr_plot(raw_data, 'SalePrice', y_lower_scale=False, same_fig=False)
-#    plt.hist(x=raw_data['SalePrice'])
-#    plt.show()
-#    corr_plot(raw_data, 'SalePrice', plot_type='hist', y_lower_scale=False, same_fig=False)
+    plt.hist(x=raw_data['SalePrice'])
+    plt.show()
+    corr_plot(raw_data, 'SalePrice', plot_type='hist', y_lower_scale=False, same_fig=False)
 
     
 if __name__ == '__main__':
