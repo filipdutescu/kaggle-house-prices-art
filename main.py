@@ -5,7 +5,9 @@ from matplotlib import ticker as tick
 
 import transformers as trans
 
-from sklearn.pipeline import Pipeline 
+from sklearn.pipeline import Pipeline, FeatureUnion 
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.impute import SimpleImputer as Imputer
 
 
 # Plot correlations
@@ -55,6 +57,30 @@ def quick_analysis(data_frame:pd.DataFrame):
     print(data_frame.describe())
 
 
+# Process data creating new features and encoding categorical features, returning resulting array
+def process_data_pipeline(raw_data :pd.DataFrame, cat_features :'list of strings' = None):
+    num_cols = list(raw_data.select_dtypes(['number']).columns)
+    cat_cols = list(raw_data.select_dtypes(['object']).columns) if cat_features is None else cat_features
+
+    num_pipeline = Pipeline([
+            ('drop_non_num', trans.FeatureDropper(cat_cols, as_dataframe=True)),
+            ('Grade', trans.FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
+            ('Age', trans.FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
+            ('RemodAge', trans.FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
+            ('TotalSF', trans.FeatureCreator(['TotalBsmtSF', '1stFlrSF', '2ndFlrSF'], lambda x,y: x + y, as_dataframe=True, feat_name='TotalSF')),
+            ]) 
+    cat_pipeline = Pipeline([
+            ('drop_non_cat', trans.FeatureDropper(num_cols, as_dataframe=True)),
+            ('encode', OneHotEncoder(sparse=False)),
+        ])
+    feat_union = FeatureUnion(transformer_list=[
+            ('num_features', num_pipeline),
+            ('cat_features', cat_pipeline),
+        ])
+
+    return feat_union.fit_transform(raw_data)
+
+
 def main():
     no_data_cols = [ 'Id', 'Alley', 'FireplaceQu', 'PoolQC', 'Fence', 'MiscFeature' ]
     raw_data = load_data('train.csv', no_data_cols)
@@ -74,26 +100,45 @@ def main():
     #raw_data.drop(columns=[ 'YearBuilt', 'YearRemodAdd' ], inplace=True)
     #raw_data['PercUnfBsmt'] = raw_data['BsmtUnfSF'] / raw_data['TotalBsmtSF'] 
 
-    new_feat_pipeline = Pipeline([
+    num_cols = list(raw_data.select_dtypes(['number']).columns)
+    cat_cols = list(raw_data.select_dtypes(['object']).columns)
+
+    num_pipeline = Pipeline([
+            ('drop_non_num', trans.FeatureDropper(cat_cols, as_dataframe=True)),
             ('Grade', trans.FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
             ('Age', trans.FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
             ('RemodAge', trans.FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
             ('TotalSF', trans.FeatureCreator(['TotalBsmtSF', '1stFlrSF', '2ndFlrSF'], lambda x,y: x + y, as_dataframe=True, feat_name='TotalSF')),
             ]) 
-    raw_data = new_feat_pipeline.fit_transform(raw_data)
+    cat_pipeline = Pipeline([
+            ('drop_non_cat', trans.FeatureDropper(num_cols, as_dataframe=True)),
+            ('encode', OneHotEncoder(sparse=False)),
+        ])
+    feat_union = FeatureUnion(transformer_list=[
+            ('num_features', num_pipeline),
+            ('cat_features', cat_pipeline),
+        ])
 
-    corr_matrix = raw_data.corr()
-    sale_correl = corr_matrix['SalePrice'].sort_values(ascending=False)
-    print(sale_correl)
+    num_data = num_pipeline.fit_transform(raw_data)
+    cat_data = cat_pipeline.fit_transform(raw_data)
+#    quick_analysis(cat_data)
 
-    sale_str_corr = sale_correl.where(abs(sale_correl) > 0.5).where(abs(sale_correl) < 1).dropna() 
-#    print(sale_str_corr)
+#    corr_matrix = raw_data.corr()
+#    sale_correl = corr_matrix['SalePrice'].sort_values(ascending=False)
+#    print(sale_correl)
+
+#    low_corr_cols = corr_matrix.where(abs(sale_correl) > 0.5).where(abs(sale_correl) < 1).columns
+#    low_corr_cols = list(set(low_corr_cols) & set(cat_data.columns))
+#    print(low_corr_cols)
 
 #    corr_plot(raw_data, 'SalePrice', fig_size=(4, 4))
 #    corr_plot(raw_data, 'SalePrice', y_lower_scale=False, same_fig=False)
-    plt.hist(x=raw_data['SalePrice'])
-    plt.show()
-    corr_plot(raw_data, 'SalePrice', plot_type='hist', y_lower_scale=False, same_fig=False)
+#    plt.hist(x=raw_data['SalePrice'])
+#    plt.show()
+#    corr_plot(raw_data, 'SalePrice', plot_type='hist', y_lower_scale=False, same_fig=False)
+
+    print(cat_cols)
+    print(cat_data)
 
     
 if __name__ == '__main__':
