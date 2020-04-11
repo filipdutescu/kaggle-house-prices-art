@@ -125,11 +125,12 @@ def main():
 #    low_corr_cols = list(set(low_corr_cols) & set(cat_data.columns))
 #    print(low_corr_cols)
 
-    no_use_cols = ['MSSubClass', 'Id', 'MasVnrArea', 'Alley', 'FireplaceQu', 'PoolQC', 'Fence', 'MiscFeature', 'LotShape', 'LotConfig', 'Condition1', 'Condition2', 'HouseStyle', 'BldgType', 'RoofStyle', 'RoofMatl', 'Exterior1st', 'Exterior2nd', 'MasVnrType', 'Foundation', 'BsmtExposure', 'BsmtFinType1', 'BsmtFinType2', 'Electrical', 'KitchenQual', 'GarageQual', 'GarageYrBlt', 'MiscVal', 'SalePrice']
+    no_use_cols = ['MSSubClass', 'Id', 'MasVnrArea', 'Alley', 'FireplaceQu', 'PoolQC', 'Fence', 'MiscFeature', 'LotShape', 'LotConfig', 'Condition1', 'Condition2', 'HouseStyle', 'BldgType', 'RoofStyle', 'RoofMatl', 'Exterior1st', 'Exterior2nd', 'MasVnrType', 'Foundation', 'BsmtExposure', 'BsmtFinType1', 'BsmtFinType2', 'Electrical', 'KitchenQual', 'GarageQual', 'GarageYrBlt', 'MiscVal', 'SalePrice', 'Functional', 'GarageType', 'GarageYrBlt', 'GarageFinish', 'GarageCond', 'HeatingQC', 'LandContour', 'LandSlope']
     no_use_cols.extend(low_corr_cols)
     train_labels = raw_data['SalePrice']
     raw_data.drop(columns=no_use_cols, inplace=True)
 #    quick_analysis(raw_data)
+    print(raw_data.info())
 
     num_cols = list(raw_data.select_dtypes(['number']).columns)
     cat_cols = list(raw_data.select_dtypes(['object']).columns)
@@ -141,7 +142,7 @@ def main():
     num_pipeline = Pipeline([
             ('drop_non_num', trans.FeatureDropper(cat_cols, as_dataframe=True)),
             ('Grade', trans.FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
-            ('Age', trans.FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
+#            ('Age', trans.FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
             ('RemodAge', trans.FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
             ('TotalSF', trans.FeatureCreator(['TotalBsmtSF', '1stFlrSF', '2ndFlrSF'], lambda x,y: x + y, as_dataframe=True, feat_name='TotalSF')),
             ('imputer_mean', Imputer(strategy='mean')),
@@ -165,7 +166,7 @@ def main():
 
 #    print(cat_cols)
 #    print(num_data.info())
-    train_feat = process_data_pipeline(raw_data, cat_cols_categs, False)
+    train_feat = process_data_pipeline(raw_data, cat_cols_categs)
 #    print(train_feat.info())
 #    print(train_feat.describe())
 #    print(train_feat.shape)
@@ -175,7 +176,7 @@ def main():
 
     fit_data_test = raw_data.iloc[:5]
     fit_label_test = train_labels.iloc[:5]
-    fit_data_test = process_data_pipeline(fit_data_test, cat_cols_categs, False)
+    fit_data_test = process_data_pipeline(fit_data_test, cat_cols_categs)
 
     print('\nPredictions:\t', list(linear_reg.predict(fit_data_test)))
     print('\nActual:\t', list(fit_label_test))
