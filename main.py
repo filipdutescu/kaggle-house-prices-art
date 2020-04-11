@@ -59,9 +59,9 @@ def quick_analysis(data_frame:pd.DataFrame):
 
 
 # Process data creating new features and encoding categorical features, returning resulting array
-def process_data_pipeline(raw_data :pd.DataFrame, cat_features :'list of strings' = None):
+def process_data_pipeline(raw_data :pd.DataFrame, cols_categs :'list of strings' = None):
     num_cols = list(raw_data.select_dtypes(['number']).columns)
-    cat_cols = list(raw_data.select_dtypes(['object']).columns) if cat_features is None else cat_features
+    cat_cols = list(raw_data.select_dtypes(['object']).columns) 
 
     num_pipeline = Pipeline([
             ('drop_non_num', trans.FeatureDropper(cat_cols, as_dataframe=True)),
@@ -75,7 +75,7 @@ def process_data_pipeline(raw_data :pd.DataFrame, cat_features :'list of strings
     cat_pipeline = Pipeline([
             ('drop_non_cat', trans.FeatureDropper(num_cols, as_dataframe=True)),
             ('imputer_most_frequent', Imputer(missing_values=np.nan, strategy='most_frequent')),
-            ('encode', OneHotEncoder(sparse=False)),
+            ('encode', OneHotEncoder(sparse=False) if cols_categs is None else OneHotEncoder(categories=cols_categs, sparse=False)),
         ])
     feat_union = FeatureUnion(transformer_list=[
             ('num_features', num_pipeline),
@@ -130,6 +130,10 @@ def main():
 
     num_cols = list(raw_data.select_dtypes(['number']).columns)
     cat_cols = list(raw_data.select_dtypes(['object']).columns)
+    cat_cols_categs = []
+    for col in cat_cols:
+        cat_cols_categs.append(raw_data[col].unique())
+#    print(cat_cols_categs)
 
     num_pipeline = Pipeline([
             ('drop_non_num', trans.FeatureDropper(cat_cols, as_dataframe=True)),
@@ -143,7 +147,7 @@ def main():
     cat_pipeline = Pipeline([
             ('drop_non_cat', trans.FeatureDropper(num_cols, as_dataframe=True)),
             ('imputer_most_frequent', Imputer(missing_values=np.nan, strategy='most_frequent')),
-            ('encode', OneHotEncoder(sparse=False)),
+            ('encode', OneHotEncoder(categories=cat_cols_categs, sparse=False)),
         ])
     feat_union = FeatureUnion(transformer_list=[
             ('num_features', num_pipeline),
@@ -158,7 +162,7 @@ def main():
 
 #    print(cat_cols)
 #    print(num_data.info())
-    train_feat = process_data_pipeline(raw_data)
+    train_feat = process_data_pipeline(raw_data, cat_cols_categs)
 #    print(train_feat.info())
 #    print(train_feat.describe())
 #    print(train_feat.shape)
@@ -168,19 +172,18 @@ def main():
 
     fit_data_test = raw_data.iloc[:5]
     fit_label_test = train_labels.iloc[:5]
-#    print(fit_data_test, '\n', fit_data_test.info())
-#    fit_data_test = process_data_pipeline(fit_data_test)
+    fit_data_test = process_data_pipeline(fit_data_test, cat_cols_categs)
 
-#    print('\nPredictions:\t', linear_reg.predict(fit_data_test))
-#    print('\nActual:\t', list(fit_label_test))
+    print('\nPredictions:\t', list(linear_reg.predict(fit_data_test)))
+    print('\nActual:\t', list(fit_label_test))
 
-    train_num_data = num_pipeline.fit_transform(fit_data_test)
-    train_cat_data = cat_pipeline.fit_transform(fit_data_test)
-    num_data = num_pipeline.fit_transform(raw_data)
-    cat_data = cat_pipeline.fit_transform(raw_data)
+#    train_num_data = num_pipeline.fit_transform(fit_data_test)
+#    train_cat_data = cat_pipeline.fit_transform(fit_data_test)
+#    num_data = num_pipeline.fit_transform(raw_data)
+#    cat_data = cat_pipeline.fit_transform(raw_data)
 
-    print('Num data shapes: ', num_data.shape, train_num_data.shape)
-    print('Cat data shapes: ', cat_data.shape, train_cat_data.shape)
+#    print('Num data shapes: ', num_data.shape, train_num_data.shape)
+#    print('Cat data shapes: ', cat_data.shape, train_cat_data.shape)
 
     
 if __name__ == '__main__':
