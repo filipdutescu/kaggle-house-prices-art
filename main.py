@@ -82,16 +82,17 @@ def process_data_pipeline(raw_data :pd.DataFrame, cat_features :'list of strings
 
 
 def main():
-    no_data_cols = [ 'Id', 'Alley', 'FireplaceQu', 'PoolQC', 'Fence', 'MiscFeature' ]
-    raw_data = load_data('train.csv', no_data_cols)
-    raw_data.dropna(inplace=True)
+#    no_data_cols = [ 'Id', 'Alley', 'FireplaceQu', 'PoolQC', 'Fence', 'MiscFeature' ]
+#    raw_data = load_data('train.csv', no_data_cols)
+    raw_data = load_data('train.csv')
+#    raw_data.dropna(inplace=True)
     #quick_analysis(raw_data)
 
     #plt.hist(raw_data['SalePrice'])
     #plt.show()
 
-    #non_numeric_cols = raw_data.loc[:, raw_data.dtypes == object]
-    #quick_analysis(non_numeric_cols)
+#    non_numeric_cols = raw_data.loc[:, raw_data.dtypes == object]
+#    quick_analysis(non_numeric_cols)
 
     #for col in non_numeric_cols.columns:
     #    print(non_numeric_cols[col].value_counts())
@@ -102,9 +103,11 @@ def main():
 
     num_cols = list(raw_data.select_dtypes(['number']).columns)
     cat_cols = list(raw_data.select_dtypes(['object']).columns)
+    no_use_cols = ['Id', 'Alley', 'FireplaceQu', 'PoolQC', 'Fence', 'MiscFeature', 'LotShape', 'LotConfig', 'Condition1', 'Condition2', 'HouseStyle', 'BldgType', 'RoofStyle', 'RoofMatl', 'Exterior1st', 'Exterior2nd', 'MasVnrType', 'MasVnrArea', 'Foundation', 'BsmtExposure', 'BsmtFinType1', 'BsmtFinType2', 'Electrical', 'KitchenQual', 'GarageQual']
 
     num_pipeline = Pipeline([
             ('drop_non_num', trans.FeatureDropper(cat_cols, as_dataframe=True)),
+            ('drop_others', trans.FeatureDropper(['MSSubClass'], as_dataframe=True)),
             ('Grade', trans.FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
             ('Age', trans.FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
             ('RemodAge', trans.FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
@@ -112,6 +115,7 @@ def main():
             ]) 
     cat_pipeline = Pipeline([
             ('drop_non_cat', trans.FeatureDropper(num_cols, as_dataframe=True)),
+            ('drop_others', trans.FeatureDropper(no_use_cols, as_dataframe=True)),
             ('encode', OneHotEncoder(sparse=False)),
         ])
     feat_union = FeatureUnion(transformer_list=[
@@ -138,7 +142,7 @@ def main():
 #    corr_plot(raw_data, 'SalePrice', plot_type='hist', y_lower_scale=False, same_fig=False)
 
     print(cat_cols)
-    print(cat_data)
+    print(num_cols)
 
     
 if __name__ == '__main__':
