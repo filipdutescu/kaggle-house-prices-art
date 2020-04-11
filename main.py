@@ -8,6 +8,7 @@ import transformers as trans
 from sklearn.pipeline import Pipeline, FeatureUnion 
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.impute import SimpleImputer as Imputer
+from sklearn.linear_model import LinearRegression
 
 
 # Plot correlations
@@ -68,9 +69,12 @@ def process_data_pipeline(raw_data :pd.DataFrame, cat_features :'list of strings
             ('Age', trans.FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
             ('RemodAge', trans.FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
             ('TotalSF', trans.FeatureCreator(['TotalBsmtSF', '1stFlrSF', '2ndFlrSF'], lambda x,y: x + y, as_dataframe=True, feat_name='TotalSF')),
-            ]) 
+            ('imputer_mean', Imputer(strategy='mean')),
+            ('std_scaler', StandardScaler())
+        ]) 
     cat_pipeline = Pipeline([
             ('drop_non_cat', trans.FeatureDropper(num_cols, as_dataframe=True)),
+            ('imputer_most_frequent', Imputer(missing_values=np.nan, strategy='most_frequent')),
             ('encode', OneHotEncoder(sparse=False)),
         ])
     feat_union = FeatureUnion(transformer_list=[
@@ -101,21 +105,44 @@ def main():
     #raw_data.drop(columns=[ 'YearBuilt', 'YearRemodAdd' ], inplace=True)
     #raw_data['PercUnfBsmt'] = raw_data['BsmtUnfSF'] / raw_data['TotalBsmtSF'] 
 
+    corr_matrix = raw_data.corr()
+    sale_correl = corr_matrix['SalePrice'].sort_values(ascending=False)
+#    print(sale_correl)
+
+#    sale_correl_cols = corr_matrix.where(abs(sale_correl) > 0.5).where(abs(sale_correl) < 1).columns
+    low_corr_cols = list(corr_matrix.where(abs(sale_correl) <= 0.5).columns)
+    low_corr_cols.remove('OverallCond')
+    low_corr_cols.remove('OverallQual')
+    low_corr_cols.remove('YrSold')
+    low_corr_cols.remove('YearBuilt')
+    low_corr_cols.remove('YearRemodAdd')
+    low_corr_cols.remove('TotalBsmtSF')
+    low_corr_cols.remove('1stFlrSF')
+    low_corr_cols.remove('2ndFlrSF')
+#    low_corr_cols = list(set(low_corr_cols) & set(cat_data.columns))
+#    print(low_corr_cols)
+
+    no_use_cols = ['MSSubClass', 'Id', 'MasVnrArea', 'Alley', 'FireplaceQu', 'PoolQC', 'Fence', 'MiscFeature', 'LotShape', 'LotConfig', 'Condition1', 'Condition2', 'HouseStyle', 'BldgType', 'RoofStyle', 'RoofMatl', 'Exterior1st', 'Exterior2nd', 'MasVnrType', 'Foundation', 'BsmtExposure', 'BsmtFinType1', 'BsmtFinType2', 'Electrical', 'KitchenQual', 'GarageQual', 'GarageYrBlt', 'MiscVal', 'SalePrice']
+    no_use_cols.extend(low_corr_cols)
+    train_labels = raw_data['SalePrice']
+    raw_data.drop(columns=no_use_cols, inplace=True)
+#    quick_analysis(raw_data)
+
     num_cols = list(raw_data.select_dtypes(['number']).columns)
     cat_cols = list(raw_data.select_dtypes(['object']).columns)
-    no_use_cols = ['Id', 'Alley', 'FireplaceQu', 'PoolQC', 'Fence', 'MiscFeature', 'LotShape', 'LotConfig', 'Condition1', 'Condition2', 'HouseStyle', 'BldgType', 'RoofStyle', 'RoofMatl', 'Exterior1st', 'Exterior2nd', 'MasVnrType', 'MasVnrArea', 'Foundation', 'BsmtExposure', 'BsmtFinType1', 'BsmtFinType2', 'Electrical', 'KitchenQual', 'GarageQual']
 
     num_pipeline = Pipeline([
             ('drop_non_num', trans.FeatureDropper(cat_cols, as_dataframe=True)),
-            ('drop_others', trans.FeatureDropper(['MSSubClass'], as_dataframe=True)),
             ('Grade', trans.FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
             ('Age', trans.FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
             ('RemodAge', trans.FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
             ('TotalSF', trans.FeatureCreator(['TotalBsmtSF', '1stFlrSF', '2ndFlrSF'], lambda x,y: x + y, as_dataframe=True, feat_name='TotalSF')),
+            ('imputer_mean', Imputer(strategy='mean')),
+            ('std_scaler', StandardScaler())
             ]) 
     cat_pipeline = Pipeline([
             ('drop_non_cat', trans.FeatureDropper(num_cols, as_dataframe=True)),
-            ('drop_others', trans.FeatureDropper(no_use_cols, as_dataframe=True)),
+            ('imputer_most_frequent', Imputer(missing_values=np.nan, strategy='most_frequent')),
             ('encode', OneHotEncoder(sparse=False)),
         ])
     feat_union = FeatureUnion(transformer_list=[
@@ -123,26 +150,37 @@ def main():
             ('cat_features', cat_pipeline),
         ])
 
-    num_data = num_pipeline.fit_transform(raw_data)
-    cat_data = cat_pipeline.fit_transform(raw_data)
-#    quick_analysis(cat_data)
-
-#    corr_matrix = raw_data.corr()
-#    sale_correl = corr_matrix['SalePrice'].sort_values(ascending=False)
-#    print(sale_correl)
-
-#    low_corr_cols = corr_matrix.where(abs(sale_correl) > 0.5).where(abs(sale_correl) < 1).columns
-#    low_corr_cols = list(set(low_corr_cols) & set(cat_data.columns))
-#    print(low_corr_cols)
-
 #    corr_plot(raw_data, 'SalePrice', fig_size=(4, 4))
 #    corr_plot(raw_data, 'SalePrice', y_lower_scale=False, same_fig=False)
 #    plt.hist(x=raw_data['SalePrice'])
 #    plt.show()
 #    corr_plot(raw_data, 'SalePrice', plot_type='hist', y_lower_scale=False, same_fig=False)
 
-    print(cat_cols)
-    print(num_cols)
+#    print(cat_cols)
+#    print(num_data.info())
+    train_feat = process_data_pipeline(raw_data)
+#    print(train_feat.info())
+#    print(train_feat.describe())
+#    print(train_feat.shape)
+
+    linear_reg = LinearRegression()
+    linear_reg.fit(train_feat, train_labels)
+
+    fit_data_test = raw_data.iloc[:5]
+    fit_label_test = train_labels.iloc[:5]
+#    print(fit_data_test, '\n', fit_data_test.info())
+#    fit_data_test = process_data_pipeline(fit_data_test)
+
+#    print('\nPredictions:\t', linear_reg.predict(fit_data_test))
+#    print('\nActual:\t', list(fit_label_test))
+
+    train_num_data = num_pipeline.fit_transform(fit_data_test)
+    train_cat_data = cat_pipeline.fit_transform(fit_data_test)
+    num_data = num_pipeline.fit_transform(raw_data)
+    cat_data = cat_pipeline.fit_transform(raw_data)
+
+    print('Num data shapes: ', num_data.shape, train_num_data.shape)
+    print('Cat data shapes: ', cat_data.shape, train_cat_data.shape)
 
     
 if __name__ == '__main__':
