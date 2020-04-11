@@ -59,7 +59,7 @@ def quick_analysis(data_frame:pd.DataFrame):
 
 
 # Process data creating new features and encoding categorical features, returning resulting array
-def process_data_pipeline(raw_data :pd.DataFrame, cols_categs :'list of strings' = None):
+def process_data_pipeline(raw_data :pd.DataFrame, cols_categs :'list of strings' = None, use_cat_feat :bool = True):
     num_cols = list(raw_data.select_dtypes(['number']).columns)
     cat_cols = list(raw_data.select_dtypes(['object']).columns) 
 
@@ -72,6 +72,9 @@ def process_data_pipeline(raw_data :pd.DataFrame, cols_categs :'list of strings'
             ('imputer_mean', Imputer(strategy='mean')),
             ('std_scaler', StandardScaler())
         ]) 
+    if use_cat_feat is False:
+        return num_pipeline.fit_transform(raw_data)
+
     cat_pipeline = Pipeline([
             ('drop_non_cat', trans.FeatureDropper(num_cols, as_dataframe=True)),
             ('imputer_most_frequent', Imputer(missing_values=np.nan, strategy='most_frequent')),
@@ -162,7 +165,7 @@ def main():
 
 #    print(cat_cols)
 #    print(num_data.info())
-    train_feat = process_data_pipeline(raw_data, cat_cols_categs)
+    train_feat = process_data_pipeline(raw_data, cat_cols_categs, False)
 #    print(train_feat.info())
 #    print(train_feat.describe())
 #    print(train_feat.shape)
@@ -172,7 +175,7 @@ def main():
 
     fit_data_test = raw_data.iloc[:5]
     fit_label_test = train_labels.iloc[:5]
-    fit_data_test = process_data_pipeline(fit_data_test, cat_cols_categs)
+    fit_data_test = process_data_pipeline(fit_data_test, cat_cols_categs, False)
 
     print('\nPredictions:\t', list(linear_reg.predict(fit_data_test)))
     print('\nActual:\t', list(fit_label_test))
