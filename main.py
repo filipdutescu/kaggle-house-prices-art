@@ -12,6 +12,7 @@ from sklearn.impute import SimpleImputer as Imputer
 from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor
+from xgboost import XGBRegressor
 
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import cross_val_score
@@ -236,6 +237,14 @@ def main():
     rf_rmse = np.sqrt(-rf_scores)
     print('Random forest:')
     print_scores(rf_rmse)
+    
+    xgbst = XGBRegressor()
+    xgb_scores = cross_val_score(xgbst, train_feat, train_labels,
+            scoring='neg_mean_squared_error',
+            cv=10)
+    xgb_rmse = np.sqrt(-xgb_scores)
+    print('XGBoost regressor:')
+    print_scores(xgb_rmse)
 
     
 if __name__ == '__main__':
