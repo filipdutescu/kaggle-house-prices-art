@@ -71,7 +71,7 @@ def process_data_pipeline(raw_data :pd.DataFrame, num_feat:'list of numbers', ca
 #            ('drop_non_num', FeatureDropper(cat_cols, as_dataframe=True)),
             ('feat_sel', FeatureSelector(num_feat, True)),
             ('Grade', FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
-            ('Age', FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
+#            ('Age', FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
             ('RemodAge', FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
             ('TotalSF', FeatureCreator(['TotalBsmtSF', '1stFlrSF', '2ndFlrSF'], lambda x,y: x + y, as_dataframe=True, feat_name='TotalSF')),
             ('imputer_mean', Imputer(strategy='mean')),
@@ -103,6 +103,15 @@ def print_scores(scores):
     print('Std. deviation: ', scores.std(), '\n')
 
 
+# Test regression model using the cross validation method
+def cross_eval_model(model, data, labels, scoring :str = 'neg_mean_squared_error', no_cv :int = 10, neg_scoring :bool = True, display_scores :bool =True):
+    scores = cross_val_score(model, data, labels,
+            scoring=scoring,
+            cv=no_cv)
+    final_scores = np.sqrt(-scores) if neg_scoring is True else scores
+    print_scores(final_scores)
+
+
 def main():
 #    no_data_cols = [ 'Id', 'Alley', 'FireplaceQu', 'PoolQC', 'Fence', 'MiscFeature' ]
 #    raw_data = load_data('train.csv', no_data_cols)
@@ -123,25 +132,15 @@ def main():
     #raw_data.drop(columns=[ 'YearBuilt', 'YearRemodAdd' ], inplace=True)
     #raw_data['PercUnfBsmt'] = raw_data['BsmtUnfSF'] / raw_data['TotalBsmtSF'] 
 
-    corr_matrix = raw_data.corr()
-    sale_correl = corr_matrix['SalePrice'].sort_values(ascending=False)
+#    corr_matrix = raw_data.corr()
+#    sale_correl = corr_matrix['SalePrice'].sort_values(ascending=False)
 #    print(sale_correl)
 
 #    sale_correl_cols = corr_matrix.where(abs(sale_correl) > 0.5).where(abs(sale_correl) < 1).columns
-    low_corr_cols = list(corr_matrix.where(abs(sale_correl) <= 0.5).columns)
-    low_corr_cols.remove('OverallCond')
-    low_corr_cols.remove('OverallQual')
-    low_corr_cols.remove('YrSold')
-    low_corr_cols.remove('YearBuilt')
-    low_corr_cols.remove('YearRemodAdd')
-    low_corr_cols.remove('TotalBsmtSF')
-    low_corr_cols.remove('1stFlrSF')
-    low_corr_cols.remove('2ndFlrSF')
+#    low_corr_cols = list(corr_matrix.where(abs(sale_correl) <= 0.5).columns)
 #    low_corr_cols = list(set(low_corr_cols) & set(cat_data.columns))
-    print(low_corr_cols)
+#    print(low_corr_cols)
 
-#    no_use_cols = ['MSSubClass', 'Id', 'MasVnrArea', 'Alley', 'FireplaceQu', 'PoolQC', 'Fence', 'MiscFeature', 'LotShape', 'LotConfig', 'Condition1', 'Condition2', 'HouseStyle', 'BldgType', 'RoofStyle', 'RoofMatl', 'Exterior1st', 'Exterior2nd', 'MasVnrType', 'Foundation', 'BsmtExposure', 'BsmtFinType1', 'BsmtFinType2', 'Electrical', 'KitchenQual', 'GarageQual', 'GarageYrBlt', 'MiscVal', 'SalePrice', 'Functional', 'GarageType', 'GarageYrBlt', 'GarageFinish', 'GarageCond', 'HeatingQC', 'LandContour', 'LandSlope']
-#    no_use_cols.extend(low_corr_cols)
     train_labels = raw_data['SalePrice']
 #    raw_data.drop(columns=no_use_cols, inplace=True)
 #    quick_analysis(raw_data)
@@ -214,37 +213,21 @@ def main():
 #    dt_rmse = np.sqrt(dt_err)
 #    print('Decision tree error: %d\n' % dt_rmse)
 
-    dt_scores = cross_val_score(dec_tree, train_feat, train_labels, 
-            scoring='neg_mean_squared_error', 
-            cv=10)
-    dt_rmse = np.sqrt(-dt_scores)
-    print('Decision tree scores:')
-    print_scores(dt_rmse)
-
     linear_reg = LinearRegression()
-    lr_scores = cross_val_score(linear_reg, train_feat, train_labels,
-            scoring='neg_mean_squared_error',
-            cv=10)
-    lr_rmse = np.sqrt(-lr_scores)
     print('Linear regression:')
-    print_scores(lr_rmse)
+    cross_eval_model(linear_reg, train_feat, train_labels)
+
+    dec_tree = DecisionTreeRegressor()
+    print('Decision tree scores:')
+    cross_eval_model(dec_tree, train_feat, train_labels)
 
     rand_for = RandomForestRegressor()
-#    rand_for.fit(train_feat, train_labels)
-    rf_scores = cross_val_score(rand_for, train_feat, train_labels,
-            scoring='neg_mean_squared_error',
-            cv=10)
-    rf_rmse = np.sqrt(-rf_scores)
     print('Random forest:')
-    print_scores(rf_rmse)
+    cross_eval_model(rand_for, train_feat, train_labels)
     
     xgbst = XGBRegressor()
-    xgb_scores = cross_val_score(xgbst, train_feat, train_labels,
-            scoring='neg_mean_squared_error',
-            cv=10)
-    xgb_rmse = np.sqrt(-xgb_scores)
     print('XGBoost regressor:')
-    print_scores(xgb_rmse)
+    cross_eval_model(xgbst, train_feat, train_labels)
 
     
 if __name__ == '__main__':
