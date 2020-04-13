@@ -8,7 +8,13 @@ from transformers import FeatureCreator, FeatureSelector, FeatureDropper
 from sklearn.pipeline import Pipeline, FeatureUnion 
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.impute import SimpleImputer as Imputer
+
 from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor
+
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import cross_val_score
 
 
 # Plot correlations
@@ -87,6 +93,13 @@ def process_data_pipeline(raw_data :pd.DataFrame, num_feat:'list of numbers', ca
         ])
 
     return feat_union.fit_transform(raw_data)
+
+
+# Display cross validation score statistics
+def print_scores(scores):
+    print('Scores: ', scores)
+    print('Mean: ', scores.mean())
+    print('Std. deviation: ', scores.std(), '\n')
 
 
 def main():
@@ -170,12 +183,13 @@ def main():
     linear_reg = LinearRegression()
     linear_reg.fit(train_feat, train_labels)
 
-    fit_data_test = raw_data.iloc[:5]
-    fit_label_test = train_labels.iloc[:5]
-    fit_data_test = process_data_pipeline(fit_data_test, num_cols, cat_cols, cat_cols_categs)
+#    fit_data_test = raw_data.iloc[:5]
+#    fit_label_test = train_labels.iloc[:5]
+#    fit_data_test = process_data_pipeline(fit_data_test, num_cols, cat_cols, cat_cols_categs)
+#    lr_pred = linear_reg.predict(fit_data_test)
 
-    print('\nPredictions:\t', list(linear_reg.predict(fit_data_test)))
-    print('\nActual:\t', list(fit_label_test))
+#    print('\nPredictions:\t', list(lr_pred))
+#    print('\nActual:\t', list(fit_label_test))
 
 #    train_num_data = num_pipeline.fit_transform(fit_data_test)
 #    train_cat_data = cat_pipeline.fit_transform(fit_data_test)
@@ -184,6 +198,44 @@ def main():
 
 #    print('Num data shapes: ', num_data.shape, train_num_data.shape)
 #    print('Cat data shapes: ', cat_data.shape, train_cat_data.shape)
+
+    print(raw_data['SalePrice'].describe(), '\n')
+
+#    lr_pred = linear_reg.predict(train_feat)
+#    lr_err = mean_squared_error(train_labels, lr_pred)
+#    lr_rmse = np.sqrt(lr_err)
+#    print('Linear regression error: %d\n' % lr_rmse)
+
+    dec_tree = DecisionTreeRegressor()
+    dec_tree.fit(train_feat, train_labels)
+#    dec_tree_pred = dec_tree.predict(train_feat)
+#    dt_err = mean_squared_error(train_labels, dec_tree_pred)
+#    dt_rmse = np.sqrt(dt_err)
+#    print('Decision tree error: %d\n' % dt_rmse)
+
+    dt_scores = cross_val_score(dec_tree, train_feat, train_labels, 
+            scoring='neg_mean_squared_error', 
+            cv=10)
+    dt_rmse = np.sqrt(-dt_scores)
+    print('Decision tree scores:')
+    print_scores(dt_rmse)
+
+    linear_reg = LinearRegression()
+    lr_scores = cross_val_score(linear_reg, train_feat, train_labels,
+            scoring='neg_mean_squared_error',
+            cv=10)
+    lr_rmse = np.sqrt(-lr_scores)
+    print('Linear regression:')
+    print_scores(lr_rmse)
+
+    rand_for = RandomForestRegressor()
+#    rand_for.fit(train_feat, train_labels)
+    rf_scores = cross_val_score(rand_for, train_feat, train_labels,
+            scoring='neg_mean_squared_error',
+            cv=10)
+    rf_rmse = np.sqrt(-rf_scores)
+    print('Random forest:')
+    print_scores(rf_rmse)
 
     
 if __name__ == '__main__':
