@@ -3,7 +3,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import ticker as tick
 
-import transformers as trans
+from transformers import FeatureCreator, FeatureSelector, FeatureDropper 
 
 from sklearn.pipeline import Pipeline, FeatureUnion 
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -59,26 +59,27 @@ def quick_analysis(data_frame:pd.DataFrame):
 
 
 # Process data creating new features and encoding categorical features, returning resulting array
-def process_data_pipeline(raw_data :pd.DataFrame, cols_categs :'list of strings' = None, use_cat_feat :bool = True):
-    num_cols = list(raw_data.select_dtypes(['number']).columns)
-    cat_cols = list(raw_data.select_dtypes(['object']).columns) 
-
+def process_data_pipeline(raw_data :pd.DataFrame, num_feat:'list of numbers', categ_feat :'list of strings' = None, categ_feat_vals:'list of strings' = None):
     num_pipeline = Pipeline([
-            ('drop_non_num', trans.FeatureDropper(cat_cols, as_dataframe=True)),
-            ('Grade', trans.FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
-            ('Age', trans.FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
-            ('RemodAge', trans.FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
-            ('TotalSF', trans.FeatureCreator(['TotalBsmtSF', '1stFlrSF', '2ndFlrSF'], lambda x,y: x + y, as_dataframe=True, feat_name='TotalSF')),
+#            ('drop_non_num', FeatureDropper(cat_cols, as_dataframe=True)),
+            ('feat_sel', FeatureSelector(num_feat, True)),
+            ('Grade', FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
+            ('Age', FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
+            ('RemodAge', FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
+            ('TotalSF', FeatureCreator(['TotalBsmtSF', '1stFlrSF', '2ndFlrSF'], lambda x,y: x + y, as_dataframe=True, feat_name='TotalSF')),
             ('imputer_mean', Imputer(strategy='mean')),
             ('std_scaler', StandardScaler())
         ]) 
-    if use_cat_feat is False:
+    if categ_feat is None:
         return num_pipeline.fit_transform(raw_data)
 
+    categ_cols = [raw_data[col].unique() for col in categ_feat] if categ_feat_vals is None else categ_feat_vals
+
     cat_pipeline = Pipeline([
-            ('drop_non_cat', trans.FeatureDropper(num_cols, as_dataframe=True)),
+#            ('drop_non_cat', FeatureDropper(num_cols, as_dataframe=True)),
+            ('feat_sel', FeatureSelector(categ_feat, True)),
             ('imputer_most_frequent', Imputer(missing_values=np.nan, strategy='most_frequent')),
-            ('encode', OneHotEncoder(sparse=False) if cols_categs is None else OneHotEncoder(categories=cols_categs, sparse=False)),
+            ('encode', OneHotEncoder(sparse=False) if categ_cols is None else OneHotEncoder(categories=categ_cols, sparse=False)),
         ])
     feat_union = FeatureUnion(transformer_list=[
             ('num_features', num_pipeline),
@@ -123,40 +124,35 @@ def main():
     low_corr_cols.remove('1stFlrSF')
     low_corr_cols.remove('2ndFlrSF')
 #    low_corr_cols = list(set(low_corr_cols) & set(cat_data.columns))
-#    print(low_corr_cols)
+    print(low_corr_cols)
 
-    no_use_cols = ['MSSubClass', 'Id', 'MasVnrArea', 'Alley', 'FireplaceQu', 'PoolQC', 'Fence', 'MiscFeature', 'LotShape', 'LotConfig', 'Condition1', 'Condition2', 'HouseStyle', 'BldgType', 'RoofStyle', 'RoofMatl', 'Exterior1st', 'Exterior2nd', 'MasVnrType', 'Foundation', 'BsmtExposure', 'BsmtFinType1', 'BsmtFinType2', 'Electrical', 'KitchenQual', 'GarageQual', 'GarageYrBlt', 'MiscVal', 'SalePrice', 'Functional', 'GarageType', 'GarageYrBlt', 'GarageFinish', 'GarageCond', 'HeatingQC', 'LandContour', 'LandSlope']
-    no_use_cols.extend(low_corr_cols)
+#    no_use_cols = ['MSSubClass', 'Id', 'MasVnrArea', 'Alley', 'FireplaceQu', 'PoolQC', 'Fence', 'MiscFeature', 'LotShape', 'LotConfig', 'Condition1', 'Condition2', 'HouseStyle', 'BldgType', 'RoofStyle', 'RoofMatl', 'Exterior1st', 'Exterior2nd', 'MasVnrType', 'Foundation', 'BsmtExposure', 'BsmtFinType1', 'BsmtFinType2', 'Electrical', 'KitchenQual', 'GarageQual', 'GarageYrBlt', 'MiscVal', 'SalePrice', 'Functional', 'GarageType', 'GarageYrBlt', 'GarageFinish', 'GarageCond', 'HeatingQC', 'LandContour', 'LandSlope']
+#    no_use_cols.extend(low_corr_cols)
     train_labels = raw_data['SalePrice']
-    raw_data.drop(columns=no_use_cols, inplace=True)
+#    raw_data.drop(columns=no_use_cols, inplace=True)
 #    quick_analysis(raw_data)
-    print(raw_data.info())
+#    print(raw_data.info())
 
-    num_cols = list(raw_data.select_dtypes(['number']).columns)
-    cat_cols = list(raw_data.select_dtypes(['object']).columns)
-    cat_cols_categs = []
-    for col in cat_cols:
-        cat_cols_categs.append(raw_data[col].unique())
+    num_cols = ['OverallQual', 'OverallCond', 'YearBuilt', 'YearRemodAdd', 'TotalBsmtSF', '1stFlrSF', '2ndFlrSF', 'YrSold'] 
+    cat_cols = [
+#            'MSZoning', 
+#            'Street', 
+            'Utilities', 
+            'Neighborhood', 
+            'ExterQual', 
+            'ExterCond', 
+            'BsmtQual', 
+            'BsmtCond', 
+            'Heating', 
+            'CentralAir', 
+            'PavedDrive', 
+            'SaleType', 
+#            'SaleCondition'
+        ]
+    cat_cols_categs = [raw_data[col].unique() for col in cat_cols]
+#    for col in cat_cols:
+#        cat_cols_categs.append(raw_data[col].unique())
 #    print(cat_cols_categs)
-
-    num_pipeline = Pipeline([
-            ('drop_non_num', trans.FeatureDropper(cat_cols, as_dataframe=True)),
-            ('Grade', trans.FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
-#            ('Age', trans.FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
-            ('RemodAge', trans.FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
-            ('TotalSF', trans.FeatureCreator(['TotalBsmtSF', '1stFlrSF', '2ndFlrSF'], lambda x,y: x + y, as_dataframe=True, feat_name='TotalSF')),
-            ('imputer_mean', Imputer(strategy='mean')),
-            ('std_scaler', StandardScaler())
-            ]) 
-    cat_pipeline = Pipeline([
-            ('drop_non_cat', trans.FeatureDropper(num_cols, as_dataframe=True)),
-            ('imputer_most_frequent', Imputer(missing_values=np.nan, strategy='most_frequent')),
-            ('encode', OneHotEncoder(categories=cat_cols_categs, sparse=False)),
-        ])
-    feat_union = FeatureUnion(transformer_list=[
-            ('num_features', num_pipeline),
-            ('cat_features', cat_pipeline),
-        ])
 
 #    corr_plot(raw_data, 'SalePrice', fig_size=(4, 4))
 #    corr_plot(raw_data, 'SalePrice', y_lower_scale=False, same_fig=False)
@@ -166,7 +162,7 @@ def main():
 
 #    print(cat_cols)
 #    print(num_data.info())
-    train_feat = process_data_pipeline(raw_data, cat_cols_categs)
+    train_feat = process_data_pipeline(raw_data, num_cols, cat_cols)
 #    print(train_feat.info())
 #    print(train_feat.describe())
 #    print(train_feat.shape)
@@ -176,7 +172,7 @@ def main():
 
     fit_data_test = raw_data.iloc[:5]
     fit_label_test = train_labels.iloc[:5]
-    fit_data_test = process_data_pipeline(fit_data_test, cat_cols_categs)
+    fit_data_test = process_data_pipeline(fit_data_test, num_cols, cat_cols, cat_cols_categs)
 
     print('\nPredictions:\t', list(linear_reg.predict(fit_data_test)))
     print('\nActual:\t', list(fit_label_test))

@@ -40,3 +40,17 @@ class FeatureDropper(BaseEstimator, TransformerMixin):
         return np.c_[X.drop(columns=self.features)]
 
 
+class FeatureSelector(BaseEstimator, TransformerMixin):
+    def __init__(self, features, as_dataframe :bool = False):
+        self.features = features
+        self.as_dataframe = as_dataframe
+
+    def fit(self, X, y = None):
+        return self
+
+    def transform(self, X, y = None):
+        if self.as_dataframe == True:
+            return X[self.features]
+        return np.c_[X[self.features]]
+
+
