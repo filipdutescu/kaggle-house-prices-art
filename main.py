@@ -66,7 +66,7 @@ def quick_analysis(data_frame:pd.DataFrame):
 
 
 # Process data creating new features and encoding categorical features, returning resulting array
-def process_data_pipeline(raw_data :pd.DataFrame, num_feat:'list of numbers', categ_feat :'list of strings' = None, categ_feat_vals:'list of strings' = None):
+def process_data_pipeline(raw_data :pd.DataFrame, num_feat:'list of numbers', categ_feat :'list of strings' = None, categ_feat_vals:'list of strings' = None, just_transform :bool = False):
     num_pipeline = Pipeline([
 #            ('drop_non_num', FeatureDropper(cat_cols, as_dataframe=True)),
             ('feat_sel', FeatureSelector(num_feat, True)),
@@ -78,6 +78,8 @@ def process_data_pipeline(raw_data :pd.DataFrame, num_feat:'list of numbers', ca
             ('std_scaler', StandardScaler())
         ]) 
     if categ_feat is None:
+        if just_transform is True:
+            return num_pipeline.transform(raw_data)
         return num_pipeline.fit_transform(raw_data)
 
     categ_cols = [raw_data[col].unique() for col in categ_feat] if categ_feat_vals is None else categ_feat_vals
@@ -93,6 +95,8 @@ def process_data_pipeline(raw_data :pd.DataFrame, num_feat:'list of numbers', ca
             ('cat_features', cat_pipeline),
         ])
 
+    if just_transform is True:
+        return feat_union.transform(raw_data)
     return feat_union.fit_transform(raw_data)
 
 
@@ -141,7 +145,7 @@ def main():
 #    low_corr_cols = list(set(low_corr_cols) & set(cat_data.columns))
 #    print(low_corr_cols)
 
-    train_labels = raw_data['SalePrice']
+    train_labels = raw_data['SalePrice'].copy()
 #    raw_data.drop(columns=no_use_cols, inplace=True)
 #    quick_analysis(raw_data)
 #    print(raw_data.info())
@@ -238,20 +242,31 @@ def main():
     grid_search = GridSearchCV(forest_reg, param_rand, cv=5, scoring='neg_mean_squared_error')
     grid_search.fit(train_feat, train_labels)
     print('Random forest best hyperparameters:')
-    print(grid_search.best_params_, grid_search.best_score_)
+    print(grid_search.best_params_, np.sqrt(-grid_search.best_score_))
 
-    cv_results = grid_search.cv_results_
-    for mean_score, params in zip(cv_results['mean_test_score'], cv_results['params']):
-        print(np.sqrt(-mean_score), params)
+#    cv_results = grid_search.cv_results_
+#    for mean_score, params in zip(cv_results['mean_test_score'], cv_results['params']):
+#        print(np.sqrt(-mean_score), params)
 
-    feat_imp = grid_search.best_estimator_.feature_importances_
-    other_feat = ['Grade', 'RemodAge', 'TotalSF']
-    all_features = num_cols
-    for cat_values in cat_cols_categs:
-        all_features.extend(cat_values)
-    all_features.extend(other_feat)
-    for feat in sorted(zip(feat_imp, all_features), reverse=True):
-        print(feat)
+#    feat_imp = grid_search.best_estimator_.feature_importances_
+#    other_feat = ['Grade', 'RemodAge', 'TotalSF']
+#    all_features = num_cols
+#    for cat_values in cat_cols_categs:
+#        all_features.extend(cat_values)
+#    all_features.extend(other_feat)
+#    for feat in sorted(zip(feat_imp, all_features), reverse=True):
+#        print(feat)
+
+    final_model = grid_search.best_estimator_
+    
+    test_data = load_data('test.csv')
+    test_labels = test_data['SalePrice'].copy()
+    test_feat = process_data_pipeline(test_data, num_cols, cat_cols, cat_cols_categs, just_transform=True)
+
+    predictions = final_model.predict(test_feat)
+    mse = mean_squared_error(test_labels, predictions)
+    rmse = np.sqrt(-mse)
+    print('Final model has an error of: ', rmse)
 
     
 if __name__ == '__main__':
