@@ -150,13 +150,13 @@ def main():
     cat_cols = [
 #            'MSZoning', 
 #            'Street', 
-            'Utilities', 
+#            'Utilities', 
             'Neighborhood', 
             'ExterQual', 
             'ExterCond', 
             'BsmtQual', 
             'BsmtCond', 
-            'Heating', 
+#            'Heating', 
             'CentralAir', 
             'PavedDrive', 
             'SaleType', 
@@ -230,15 +230,15 @@ def main():
 #    cross_eval_model(xgbst, train_feat, train_labels)
 
     param_rand = [
-            {'n_estimators': [3, 10, 30, 45, 60], 'max_features': [8, 10, 12, 16, 18, 20, 24]},
-            {'bootstrap': [False], 'n_estimators': [3, 10, 30, 45], 'max_features': [2, 3, 4, 6, 10, 12, 18]},
+            {'n_estimators': [3, 10, 30, 45], 'max_features': [10, 12, 16, 18, 20, 24]},
+            {'bootstrap': [False], 'n_estimators': [3, 10, 30, 45], 'max_features': [6, 10, 12, 18]},
         ]
     
     forest_reg = RandomForestRegressor()
     grid_search = GridSearchCV(forest_reg, param_rand, cv=5, scoring='neg_mean_squared_error')
     grid_search.fit(train_feat, train_labels)
     print('Random forest best hyperparameters:')
-    print(grid_search.best_params_)
+    print(grid_search.best_params_, grid_search.best_score_)
 
     cv_results = grid_search.cv_results_
     for mean_score, params in zip(cv_results['mean_test_score'], cv_results['params']):
