@@ -177,9 +177,27 @@ def main():
 #    plt.show()
 #    corr_plot(raw_data, 'SalePrice', plot_type='hist', y_lower_scale=False, same_fig=False)
 
+    num_pipeline = Pipeline([
+            ('feat_sel', FeatureSelector(num_cols, True)),
+            ('imputer_mean', Imputer(strategy='mean')),
+            ('std_scaler', StandardScaler())
+        ]) 
+
+    cat_pipeline = Pipeline([
+            ('feat_sel', FeatureSelector(cat_cols, True)),
+            ('imputer_most_frequent', Imputer(missing_values=np.nan, strategy='most_frequent')),
+            ('encode', OneHotEncoder(categories=cat_cols_categs, sparse=False)),
+        ])
+    feat_union = FeatureUnion(transformer_list=[
+            ('num_features', num_pipeline),
+            ('cat_features', cat_pipeline),
+        ])
+
+
+
 #    print(cat_cols)
 #    print(num_data.info())
-    train_feat = process_data_pipeline(raw_data, num_cols, cat_cols)
+    train_feat = feat_union.fit_transform(raw_data)
 #    print(train_feat.info())
 #    print(train_feat.describe())
 #    print(train_feat.shape)
@@ -260,13 +278,14 @@ def main():
     final_model = grid_search.best_estimator_
     
     test_data = load_data('test.csv')
-    test_labels = test_data['SalePrice'].copy()
-    test_feat = process_data_pipeline(test_data, num_cols, cat_cols, cat_cols_categs, just_transform=True)
+#    test_labels = test_data['SalePrice'].copy()
+    test_feat = feat_union.transform(test_data)
 
     predictions = final_model.predict(test_feat)
-    mse = mean_squared_error(test_labels, predictions)
-    rmse = np.sqrt(-mse)
-    print('Final model has an error of: ', rmse)
+    print(type(predictions))
+#    mse = mean_squared_error(test_labels, predictions)
+#    rmse = np.sqrt(-mse)
+#    print('Final model has an error of: ', rmse)
 
     
 if __name__ == '__main__':
