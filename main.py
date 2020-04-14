@@ -15,7 +15,7 @@ from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 
 from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, GridSearchCV
 
 
 # Plot correlations
@@ -70,10 +70,10 @@ def process_data_pipeline(raw_data :pd.DataFrame, num_feat:'list of numbers', ca
     num_pipeline = Pipeline([
 #            ('drop_non_num', FeatureDropper(cat_cols, as_dataframe=True)),
             ('feat_sel', FeatureSelector(num_feat, True)),
-            ('Grade', FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
+#            ('Grade', FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
 #            ('Age', FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
-            ('RemodAge', FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
-            ('TotalSF', FeatureCreator(['TotalBsmtSF', '1stFlrSF', '2ndFlrSF'], lambda x,y: x + y, as_dataframe=True, feat_name='TotalSF')),
+#            ('RemodAge', FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
+#            ('TotalSF', FeatureCreator(['TotalBsmtSF', '1stFlrSF', '2ndFlrSF'], lambda x,y: x + y, as_dataframe=True, feat_name='TotalSF')),
             ('imputer_mean', Imputer(strategy='mean')),
             ('std_scaler', StandardScaler())
         ]) 
@@ -146,7 +146,7 @@ def main():
 #    quick_analysis(raw_data)
 #    print(raw_data.info())
 
-    num_cols = ['OverallQual', 'OverallCond', 'YearBuilt', 'YearRemodAdd', 'TotalBsmtSF', '1stFlrSF', '2ndFlrSF', 'YrSold'] 
+    num_cols = ['OverallQual', 'OverallCond', 'YearBuilt', 'YearRemodAdd', 'TotalBsmtSF', '1stFlrSF', '2ndFlrSF', 'YrSold', 'MoSold'] 
     cat_cols = [
 #            'MSZoning', 
 #            'Street', 
@@ -206,28 +206,52 @@ def main():
 #    lr_rmse = np.sqrt(lr_err)
 #    print('Linear regression error: %d\n' % lr_rmse)
 
-    dec_tree = DecisionTreeRegressor()
-    dec_tree.fit(train_feat, train_labels)
+#    dec_tree = DecisionTreeRegressor()
+#    dec_tree.fit(train_feat, train_labels)
 #    dec_tree_pred = dec_tree.predict(train_feat)
 #    dt_err = mean_squared_error(train_labels, dec_tree_pred)
 #    dt_rmse = np.sqrt(dt_err)
 #    print('Decision tree error: %d\n' % dt_rmse)
 
-    linear_reg = LinearRegression()
-    print('Linear regression:')
-    cross_eval_model(linear_reg, train_feat, train_labels)
+#    linear_reg = LinearRegression()
+#    print('Linear regression:')
+#    cross_eval_model(linear_reg, train_feat, train_labels)
 
-    dec_tree = DecisionTreeRegressor()
-    print('Decision tree scores:')
-    cross_eval_model(dec_tree, train_feat, train_labels)
+#    dec_tree = DecisionTreeRegressor()
+#    print('Decision tree scores:')
+#    cross_eval_model(dec_tree, train_feat, train_labels)
 
-    rand_for = RandomForestRegressor()
-    print('Random forest:')
-    cross_eval_model(rand_for, train_feat, train_labels)
+#    rand_for = RandomForestRegressor()
+#    print('Random forest:')
+#    cross_eval_model(rand_for, train_feat, train_labels)
     
-    xgbst = XGBRegressor()
-    print('XGBoost regressor:')
-    cross_eval_model(xgbst, train_feat, train_labels)
+#    xgbst = XGBRegressor()
+#    print('XGBoost regressor:')
+#    cross_eval_model(xgbst, train_feat, train_labels)
+
+    param_rand = [
+            {'n_estimators': [3, 10, 30, 45, 60], 'max_features': [8, 10, 12, 16, 18, 20, 24]},
+            {'bootstrap': [False], 'n_estimators': [3, 10, 30, 45], 'max_features': [2, 3, 4, 6, 10, 12, 18]},
+        ]
+    
+    forest_reg = RandomForestRegressor()
+    grid_search = GridSearchCV(forest_reg, param_rand, cv=5, scoring='neg_mean_squared_error')
+    grid_search.fit(train_feat, train_labels)
+    print('Random forest best hyperparameters:')
+    print(grid_search.best_params_)
+
+    cv_results = grid_search.cv_results_
+    for mean_score, params in zip(cv_results['mean_test_score'], cv_results['params']):
+        print(np.sqrt(-mean_score), params)
+
+    feat_imp = grid_search.best_estimator_.feature_importances_
+    other_feat = ['Grade', 'RemodAge', 'TotalSF']
+    all_features = num_cols
+    for cat_values in cat_cols_categs:
+        all_features.extend(cat_values)
+    all_features.extend(other_feat)
+    for feat in sorted(zip(feat_imp, all_features), reverse=True):
+        print(feat)
 
     
 if __name__ == '__main__':
