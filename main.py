@@ -282,9 +282,11 @@ def main():
     test_feat = feat_union.transform(test_data)
 
     predictions = final_model.predict(test_feat)
-    pred_df = pd.DataFrame(data=predictions.flatten())
-    pred_df.insert(0, 'Id', range(1, len(test_data)))
+    pred_df = pd.DataFrame()
+    pred_df['Id'] = test_data['Id']
+    pred_df['SalePrice'] = predictions.flatten()
     print(pred_df)
+    pred_df.to_csv('submission.csv')
 #    mse = mean_squared_error(test_labels, predictions)
 #    rmse = np.sqrt(-mse)
 #    print('Final model has an error of: ', rmse)
