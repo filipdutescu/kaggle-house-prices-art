@@ -4,9 +4,9 @@
 This repository contains my solution to the ***Housing Prices Advanced Regression Techniques Kaggle Competition***.
 
 The source code can be found in the following:
-  * **Housing Prices Advanced Regression Techniques.ipynb:** contains the a notebook with detailed explanations, as well as source code; the recommended file to read, since code-only can be harder to grasp
-  * **main.py:** the main file, containing all the code that was used to generate and solve the problem
-  * **transformers.py:** file containing the transformers (and imputers) used in the data processing pipelines
+  * **[Housing Prices Advanced Regression Techniques.ipynb](Housing%20Prices%20Advanced%20Regression%20Techniques.ipynb):** contains the a notebook with detailed explanations, as well as source code; the recommended file to read, since code-only can be harder to grasp
+  * **[main.py](main.py):** the main file, containing all the code that was used to generate and solve the problem
+  * **[transformers.py](transformers.py):** file containing the transformers (and imputers) used in the data processing pipelines
 
 ## Technical Requirements
 In order to properly run the code provided, one needs the following:
