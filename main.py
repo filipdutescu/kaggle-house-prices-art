@@ -3,16 +3,17 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import ticker as tick
 
-from transformers import FeatureCreator, FeatureSelector, FeatureDropper 
+from transformers import FeatureCreator, FeatureSelector, FeatureDropper, CategoricalImputer
 
 from sklearn.pipeline import Pipeline, FeatureUnion 
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, RobustScaler
 from sklearn.impute import SimpleImputer as Imputer
 
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, ElasticNet
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
+from sklearn.svm import SVR
 
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import cross_val_score, GridSearchCV
@@ -68,14 +69,14 @@ def quick_analysis(data_frame:pd.DataFrame):
 # Process data creating new features and encoding categorical features, returning resulting array
 def process_data_pipeline(raw_data :pd.DataFrame, num_feat:'list of numbers', categ_feat :'list of strings' = None, categ_feat_vals:'list of strings' = None, just_transform :bool = False):
     num_pipeline = Pipeline([
-#            ('drop_non_num', FeatureDropper(cat_cols, as_dataframe=True)),
             ('feat_sel', FeatureSelector(num_feat, True)),
-#            ('Grade', FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
-#            ('Age', FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
-#            ('RemodAge', FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
-#            ('TotalSF', FeatureCreator(['TotalBsmtSF', '1stFlrSF', '2ndFlrSF'], lambda x,y: x + y, as_dataframe=True, feat_name='TotalSF')),
+            ('Grade', FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
+            ('Age', FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
+            ('RemodAge', FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
+            ('TotalSF', FeatureCreator(['TotalBsmtSF', '1stFlrSF', '2ndFlrSF'], lambda x,y: x + y, as_dataframe=True, feat_name='TotalSF')),
+            ('drop_cat_feat', FeatureDropper(['YrSold', 'OverallCond'], as_dataframe=True)),
             ('imputer_mean', Imputer(strategy='mean')),
-            ('std_scaler', StandardScaler())
+            ('std_scaler', RobustScaler())
         ]) 
     if categ_feat is None:
         if just_transform is True:
@@ -85,9 +86,8 @@ def process_data_pipeline(raw_data :pd.DataFrame, num_feat:'list of numbers', ca
     categ_cols = [raw_data[col].unique() for col in categ_feat] if categ_feat_vals is None else categ_feat_vals
 
     cat_pipeline = Pipeline([
-#            ('drop_non_cat', FeatureDropper(num_cols, as_dataframe=True)),
             ('feat_sel', FeatureSelector(categ_feat, True)),
-            ('imputer_most_frequent', Imputer(missing_values=np.nan, strategy='most_frequent')),
+            ('imputer_most_frequent', CategoricalImputer()),
             ('encode', OneHotEncoder(sparse=False) if categ_cols is None else OneHotEncoder(categories=categ_cols, sparse=False)),
         ])
     feat_union = FeatureUnion(transformer_list=[
@@ -100,196 +100,216 @@ def process_data_pipeline(raw_data :pd.DataFrame, num_feat:'list of numbers', ca
     return feat_union.fit_transform(raw_data)
 
 
-# Display cross validation score statistics
-def print_scores(scores):
-    print('Scores: ', scores)
-    print('Mean: ', scores.mean())
-    print('Std. deviation: ', scores.std(), '\n')
+# Cross-validate the given model to the data provided and tune its hyperparameters, print the score and return the best estimator
+def find_best_estimator(model, hyperparameters, data, labels, cv :int = 5):
+    grid_search = GridSearchCV(model, hyperparameters, cv=cv, scoring='neg_mean_squared_error')
+    grid_search.fit(data, labels)
 
+    print(np.sqrt(-grid_search.best_score_), grid_search.best_params_)
 
-# Test regression model using the cross validation method
-def cross_eval_model(model, data, labels, scoring :str = 'neg_mean_squared_error', no_cv :int = 10, neg_scoring :bool = True, display_scores :bool =True):
-    scores = cross_val_score(model, data, labels,
-            scoring=scoring,
-            cv=no_cv)
-    final_scores = np.sqrt(-scores) if neg_scoring is True else scores
-    print_scores(final_scores)
+    return grid_search.best_estimator_
 
 
 def main():
-#    no_data_cols = [ 'Id', 'Alley', 'FireplaceQu', 'PoolQC', 'Fence', 'MiscFeature' ]
-#    raw_data = load_data('train.csv', no_data_cols)
+    # Load data and run brief analysis on it
     raw_data = load_data('train.csv')
-#    raw_data.dropna(inplace=True)
-    #quick_analysis(raw_data)
+    quick_analysis(raw_data)
 
-    #plt.hist(raw_data['SalePrice'])
-    #plt.show()
+    plt.hist(raw_data['SalePrice'])
+    plt.show() 
 
-#    non_numeric_cols = raw_data.loc[:, raw_data.dtypes == object]
-#    quick_analysis(non_numeric_cols)
+    # View all unique values of categorical features
+    non_numeric_cols = raw_data.loc[:, raw_data.dtypes == object]
 
-    #for col in non_numeric_cols.columns:
-    #    print(non_numeric_cols[col].value_counts())
-    #    input()
+    for col in non_numeric_cols.columns:
+        print(non_numeric_cols[col].value_counts())
 
-    #raw_data.drop(columns=[ 'YearBuilt', 'YearRemodAdd' ], inplace=True)
-    #raw_data['PercUnfBsmt'] = raw_data['BsmtUnfSF'] / raw_data['TotalBsmtSF'] 
+    # Analize correlations between features and the label
+    corr_matrix = raw_data.corr()
+    sale_correl = corr_matrix['SalePrice'].sort_values(ascending=False)
+    print(sale_correl)
 
-#    corr_matrix = raw_data.corr()
-#    sale_correl = corr_matrix['SalePrice'].sort_values(ascending=False)
-#    print(sale_correl)
+    # Feature engineering the following:
+    #   Grade = OverallQual / OverallCond
+    #   Age = YrSold - YearBuilt
+    #   RemodAge = YrSold - YearRemodAdd
+    #   TotalSF = TotalBsmtSF + 1stFlrSF + 2ndFlrSF
 
-#    sale_correl_cols = corr_matrix.where(abs(sale_correl) > 0.5).where(abs(sale_correl) < 1).columns
-#    low_corr_cols = list(corr_matrix.where(abs(sale_correl) <= 0.5).columns)
-#    low_corr_cols = list(set(low_corr_cols) & set(cat_data.columns))
-#    print(low_corr_cols)
+    raw_data['Grade'] = raw_data['OverallQual'] / raw_data['OverallCond']
+    raw_data['Age'] = raw_data['YrSold'] - raw_data['YearBuilt'] 
+    raw_data['RemodAge'] = raw_data['YrSold'] - raw_data['YearRemodAdd']
+    raw_data['TotalSF'] = raw_data['TotalBsmtSF'] + raw_data['1stFlrSF'] + raw_data['2ndFlrSF']
 
-    train_labels = raw_data['SalePrice'].copy()
-#    raw_data.drop(columns=no_use_cols, inplace=True)
-#    quick_analysis(raw_data)
-#    print(raw_data.info())
+    # Correlation matrix for the new features
+    corr_matrix = raw_data.corr()
+    sale_correl = corr_matrix['SalePrice'].sort_values(ascending=False)
+    print(sale_correl)
 
-    num_cols = ['OverallQual', 'OverallCond', 'YearBuilt', 'YearRemodAdd', 'TotalBsmtSF', '1stFlrSF', '2ndFlrSF', 'YrSold', 'MoSold'] 
+    # Check correlation of new features with their respective components
+    age_correl = corr_matrix['Age'].sort_values(ascending=False)
+    print('Age correlations:', age_correl, '\n')
+
+    remod_age_correl = corr_matrix['RemodAge'].sort_values(ascending=False)
+    print('RemodAge correlations:', remod_age_correl, '\n')
+
+    grade_correl = corr_matrix['Grade'].sort_values(ascending=False)
+    print('Grade correlations:', grade_correl, '\n')
+
+    totalsf_correl = corr_matrix['TotalSF'].sort_values(ascending=False)
+    print('TotalSF correlations:', totalsf_correl, '\n')
+
+    # Correlation matrix vizualization
+    corr_plot(raw_data, 'SalePrice', fig_size=(4, 4))
+    corr_plot(raw_data, 'SalePrice', plot_type='hist', fig_size=(4, 4)) 
+    
+    # Change type of columns to reflect their nature. Concretely, change the YrSold, MoSold, MSZoning and OverallCond features to categorical ones
+    raw_data['YrSold_C'] = raw_data['YrSold'].copy().astype(str)
+    raw_data['MoSold'] = raw_data['MoSold'].astype(str)
+    raw_data['MSZoning'] = raw_data['MSZoning'].astype(str)
+    raw_data['OverallCond_C'] = raw_data['OverallCond'].copy().astype(str)
+
+    num_cols = [
+        'OverallQual',
+        'OverallCond',
+        'YearBuilt',
+        'YearRemodAdd',
+        'TotalBsmtSF',
+        '1stFlrSF',
+        '2ndFlrSF',
+        'GarageCars',
+        'GarageArea',
+        'FullBath',
+        'YrSold',
+    ]
     cat_cols = [
-#            'MSZoning', 
-#            'Street', 
-#            'Utilities', 
-            'Neighborhood', 
-            'ExterQual', 
-            'ExterCond', 
-            'BsmtQual', 
-            'BsmtCond', 
-#            'Heating', 
-            'CentralAir', 
-            'PavedDrive', 
-            'SaleType', 
-#            'SaleCondition'
-        ]
+        'MSZoning',
+        'Street',
+        'Utilities',
+        'Neighborhood',
+        'ExterQual',
+        'ExterCond',
+        'BsmtQual',
+        'BsmtCond',
+        'Heating',
+        'CentralAir',
+        'PavedDrive',
+        'SaleType',
+        'SaleCondition',
+        'YrSold_C',
+        'MoSold',
+        'OverallCond_C',
+    ]
+
+    # Create a list of all values that the categorical features can take
     cat_cols_categs = [raw_data[col].unique() for col in cat_cols]
-#    for col in cat_cols:
-#        cat_cols_categs.append(raw_data[col].unique())
-#    print(cat_cols_categs)
-
-#    corr_plot(raw_data, 'SalePrice', fig_size=(4, 4))
-#    corr_plot(raw_data, 'SalePrice', y_lower_scale=False, same_fig=False)
-#    plt.hist(x=raw_data['SalePrice'])
-#    plt.show()
-#    corr_plot(raw_data, 'SalePrice', plot_type='hist', y_lower_scale=False, same_fig=False)
-
-    num_pipeline = Pipeline([
-            ('feat_sel', FeatureSelector(num_cols, True)),
-            ('imputer_mean', Imputer(strategy='mean')),
-            ('std_scaler', StandardScaler())
-        ]) 
-
-    cat_pipeline = Pipeline([
-            ('feat_sel', FeatureSelector(cat_cols, True)),
-            ('imputer_most_frequent', Imputer(missing_values=np.nan, strategy='most_frequent')),
-            ('encode', OneHotEncoder(categories=cat_cols_categs, sparse=False)),
-        ])
-    feat_union = FeatureUnion(transformer_list=[
-            ('num_features', num_pipeline),
-            ('cat_features', cat_pipeline),
-        ])
-
-
-
-#    print(cat_cols)
-#    print(num_data.info())
-    train_feat = feat_union.fit_transform(raw_data)
-#    print(train_feat.info())
-#    print(train_feat.describe())
-#    print(train_feat.shape)
-
-    linear_reg = LinearRegression()
-    linear_reg.fit(train_feat, train_labels)
-
-#    fit_data_test = raw_data.iloc[:5]
-#    fit_label_test = train_labels.iloc[:5]
-#    fit_data_test = process_data_pipeline(fit_data_test, num_cols, cat_cols, cat_cols_categs)
-#    lr_pred = linear_reg.predict(fit_data_test)
-
-#    print('\nPredictions:\t', list(lr_pred))
-#    print('\nActual:\t', list(fit_label_test))
-
-#    train_num_data = num_pipeline.fit_transform(fit_data_test)
-#    train_cat_data = cat_pipeline.fit_transform(fit_data_test)
-#    num_data = num_pipeline.fit_transform(raw_data)
-#    cat_data = cat_pipeline.fit_transform(raw_data)
-
-#    print('Num data shapes: ', num_data.shape, train_num_data.shape)
-#    print('Cat data shapes: ', cat_data.shape, train_cat_data.shape)
-
-    print(raw_data['SalePrice'].describe(), '\n')
-
-#    lr_pred = linear_reg.predict(train_feat)
-#    lr_err = mean_squared_error(train_labels, lr_pred)
-#    lr_rmse = np.sqrt(lr_err)
-#    print('Linear regression error: %d\n' % lr_rmse)
-
-#    dec_tree = DecisionTreeRegressor()
-#    dec_tree.fit(train_feat, train_labels)
-#    dec_tree_pred = dec_tree.predict(train_feat)
-#    dt_err = mean_squared_error(train_labels, dec_tree_pred)
-#    dt_rmse = np.sqrt(dt_err)
-#    print('Decision tree error: %d\n' % dt_rmse)
-
-#    linear_reg = LinearRegression()
-#    print('Linear regression:')
-#    cross_eval_model(linear_reg, train_feat, train_labels)
-
-#    dec_tree = DecisionTreeRegressor()
-#    print('Decision tree scores:')
-#    cross_eval_model(dec_tree, train_feat, train_labels)
-
-#    rand_for = RandomForestRegressor()
-#    print('Random forest:')
-#    cross_eval_model(rand_for, train_feat, train_labels)
+    print(cat_cols_categs)
     
-#    xgbst = XGBRegressor()
-#    print('XGBoost regressor:')
-#    cross_eval_model(xgbst, train_feat, train_labels)
+    # Create the train data and labels
+    train_labels = raw_data['SalePrice'].copy()
+    train_feat = process_data_pipeline(raw_data, num_cols, cat_cols)
 
-    param_rand = [
-            {'n_estimators': [3, 10, 30, 45], 'max_features': [10, 12, 16, 18, 20, 24]},
-            {'bootstrap': [False], 'n_estimators': [3, 10, 30, 45], 'max_features': [6, 10, 12, 18]},
-        ]
-    
-    forest_reg = RandomForestRegressor()
-    grid_search = GridSearchCV(forest_reg, param_rand, cv=5, scoring='neg_mean_squared_error')
-    grid_search.fit(train_feat, train_labels)
+    # Check the linear regression model 
+    lin_reg = LinearRegression()
+    print('Linear regression best hyperparameters:')
+    final_lr_model = find_best_estimator(lin_reg, [{}], train_feat, train_labels) 
+
+    # Check the decision tree model
+    hyperparams_vals = [
+        {'max_features': [6, 10, 12, 16, 18, 20, 24]},
+    ]
+        
+    dt_reg = DecisionTreeRegressor(random_state=42)
+    print('Decision tree best hyperparameters:')
+    final_dt_model = find_best_estimator(dt_reg, hyperparams_vals, train_feat, train_labels) 
+
+    # Check the random forest model
+    hyperparams_vals = [
+        {'n_estimators': [200, 225, 250], 'max_features': [16, 24, 30]},
+        {'bootstrap': [False], 'n_estimators': [220, 225], 'max_features': [24, 28]},
+    ]
+
+    forest_reg = RandomForestRegressor(n_jobs=-1, random_state=42)
     print('Random forest best hyperparameters:')
-    print(grid_search.best_params_, np.sqrt(-grid_search.best_score_))
+    final_rf_model = find_best_estimator(forest_reg, hyperparams_vals, train_feat, train_labels)
 
-#    cv_results = grid_search.cv_results_
-#    for mean_score, params in zip(cv_results['mean_test_score'], cv_results['params']):
-#        print(np.sqrt(-mean_score), params)
+    # Check the XGBoost model
+    hyperparams_vals = [
+        {'n_estimators': [450, 500, 750], 'max_features': [2, 4, 8], 'max_depth': [3, 4, None]},
+    ]
 
-#    feat_imp = grid_search.best_estimator_.feature_importances_
-#    other_feat = ['Grade', 'RemodAge', 'TotalSF']
-#    all_features = num_cols
-#    for cat_values in cat_cols_categs:
-#        all_features.extend(cat_values)
-#    all_features.extend(other_feat)
-#    for feat in sorted(zip(feat_imp, all_features), reverse=True):
-#        print(feat)
+    xgbr_reg = XGBRegressor(learning_rate=0.05, n_threads=-1, random_state=42)
+    print('XGBoost regressor best hyperparameters:')
+    final_xgb_model = find_best_estimator(xgbr_reg, hyperparams_vals, train_feat, train_labels)
 
-    final_model = grid_search.best_estimator_
-    
-    test_data = load_data('test.csv')
-#    test_labels = test_data['SalePrice'].copy()
-    test_feat = feat_union.transform(test_data)
+    # Check the SVM model
+    hyperparams_vals = [
+        {'kernel': ['linear', 'sigmoid', 'rbf'], 'gamma': ['auto', 'scale']},
+        {'kernel': ['poly'], 'gamma': ['auto', 'scale'], 'degree': [3, 4, 5]},
+    ]
 
-    predictions = final_model.predict(test_feat)
+    svm_reg = SVR()
+    print('Support vector machine best hyperparameters:')
+    final_svm_model = find_best_estimator(svm_reg, hyperparams_vals, train_feat, train_labels)
+
+    # Check the ElasticNet model
+    hyperparams_vals = [
+        {'alpha': [0.0005, 0.005, 0.05, 0.2], 'l1_ratio': [0.1, 0.25, 0.75, 0.9]},
+    ]
+
+    enet_reg = ElasticNet(max_iter=100000000, tol=0.001)
+    print('ElasticNet best hyperparameters:')
+    final_enet_model = find_best_estimator(enet_reg, hyperparams_vals, train_feat, train_labels)
+
+    # Check the feature importances for both random forest algorithms
+    rf_feat_imp = final_rf_model.feature_importances_
+    xgb_feat_imp = final_xgb_model.feature_importances_
+
+    other_feat = ['Grade', 'RemodAge', 'TotalSF']
+    all_features = num_cols.copy()
+    print(num_cols)
+    for cat_values in cat_cols_categs.copy():
+        all_features.extend(cat_values)
+    all_features.extend(other_feat.copy())
+
+    print('Random forest feature importances:')
+    for feat in sorted(zip(rf_feat_imp, all_features), reverse=True):
+        print(feat)
+
+    print('\nXGBoost feature importances:')
+    for feat in zip(xgb_feat_imp, all_features):
+        print(feat)
+
+    # Load and process test data
+    test_data = load_data('/kaggle/input/house-prices-advanced-regression-techniques/test.csv')
+    test_data['YrSold_C'] = test_data['YrSold'].copy().astype(str).replace('nan', None)
+    test_data['MoSold'] = test_data['MoSold'].astype(str).replace('nan', None)
+    test_data['MSZoning'] = test_data['MSZoning'].astype(str).replace('nan', None)
+    test_data['OverallCond_C'] = test_data['OverallCond'].copy().astype(str).replace('nan', None)
+    test_feat = process_data_pipeline(test_data, num_cols, cat_cols, cat_cols_categs, True)
+
+    # Predict using the combination of Random Forest and XGBoost
+    rf_predictions = final_rf_model.predict(test_feat)
+    xgb_predictions = final_xgb_model.predict(test_feat)
+    predictions = rf_predictions * 0.35 + xgb_predictions * 0.65
+
+    # Save resulting predictions
     pred_df = pd.DataFrame()
     pred_df['Id'] = test_data['Id']
     pred_df['SalePrice'] = predictions.flatten()
+
     print(pred_df)
-    pred_df.to_csv('submission.csv')
-#    mse = mean_squared_error(test_labels, predictions)
-#    rmse = np.sqrt(-mse)
-#    print('Final model has an error of: ', rmse)
+    pred_df.to_csv('submission_rf_xgb.csv')
+
+    # Predict using only the XGBoost model
+    xgb_predictions = final_xgb_model.predict(test_feat)
+    predictions = xgb_predictions.copy() 
+
+    pred_df = pd.DataFrame()
+    pred_df['Id'] = test_data['Id']
+    pred_df['SalePrice'] = predictions.flatten()
+
+    print(pred_df)
+    pred_df.to_csv('submission_xgb.csv')
 
     
 if __name__ == '__main__':
