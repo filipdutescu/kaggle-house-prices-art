@@ -21,3 +21,6 @@ In order to properly run the code provided, one needs the following:
 ## Author
   * **Filip-Ioan Dutescu** - [@filipdutescu](https://github.com/filipdutescu)
 
+## License
+This project is licensed under the Apache 2.0 License - see the [LICENSE.md](LICENSE.md) file for details.
+

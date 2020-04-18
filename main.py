@@ -67,7 +67,7 @@ def quick_analysis(data_frame:pd.DataFrame):
 
 
 # Process data creating new features and encoding categorical features, returning resulting array
-def process_data_pipeline(raw_data :pd.DataFrame, num_feat:'list of numbers', categ_feat :'list of strings' = None, categ_feat_vals:'list of strings' = None, just_transform :bool = False):
+def process_data_pipeline(raw_data :pd.DataFrame, num_feat:'list of numbers', categ_feat :'list of strings' = None, categ_feat_vals:'list of strings' = None, just_transform :bool = False, just_pipeline :bool = False):
     num_pipeline = Pipeline([
             ('feat_sel', FeatureSelector(num_feat, True)),
             ('Grade', FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
@@ -94,6 +94,9 @@ def process_data_pipeline(raw_data :pd.DataFrame, num_feat:'list of numbers', ca
             ('num_features', num_pipeline),
             ('cat_features', cat_pipeline),
         ])
+
+    if just_pipeline is True:
+        return feat_union
 
     if just_transform is True:
         return feat_union.transform(raw_data)
@@ -204,9 +207,31 @@ def main():
     cat_cols_categs = [raw_data[col].unique() for col in cat_cols]
     print(cat_cols_categs)
     
+    # Create the pipeline to process data
+    num_pipeline = Pipeline([
+            ('feat_sel', FeatureSelector(num_cols, True)),
+            ('Grade', FeatureCreator(['OverallCond', 'OverallQual'], lambda x, y: x / y, as_dataframe=True, feat_name='Grade')),
+            ('Age', FeatureCreator(['YrSold', 'YearBuilt'], lambda x,y: x - y, as_dataframe=True, feat_name='Age')),
+            ('RemodAge', FeatureCreator(['YrSold', 'YearRemodAdd'], lambda x,y: x - y, as_dataframe=True, feat_name='RemodAge')),
+            ('TotalSF', FeatureCreator(['TotalBsmtSF', '1stFlrSF', '2ndFlrSF'], lambda x,y: x + y, as_dataframe=True, feat_name='TotalSF')),
+            ('drop_cat_feat', FeatureDropper(['YrSold', 'OverallCond'], as_dataframe=True)),
+            ('imputer_mean', Imputer(strategy='mean')),
+            ('std_scaler', RobustScaler())
+        ]) 
+
+    cat_pipeline = Pipeline([
+            ('feat_sel', FeatureSelector(cat_cols, True)),
+            ('imputer_most_frequent', CategoricalImputer()),
+            ('encode', OneHotEncoder(categories=cat_cols_categs, sparse=False)),
+        ])
+    feat_union = FeatureUnion(transformer_list=[
+            ('num_features', num_pipeline),
+            ('cat_features', cat_pipeline),
+        ])
+
     # Create the train data and labels
     train_labels = raw_data['SalePrice'].copy()
-    train_feat = process_data_pipeline(raw_data, num_cols, cat_cols)
+    train_feat = feat_union.fit_transform(raw_data)
 
     # Check the linear regression model 
     lin_reg = LinearRegression()
@@ -234,7 +259,7 @@ def main():
 
     # Check the XGBoost model
     hyperparams_vals = [
-        {'n_estimators': [450, 500, 750], 'max_features': [2, 4, 8], 'max_depth': [3, 4, None]},
+        {'n_estimators': [450, 500, 400], 'max_features': [2, 4, 8], 'max_depth': [3, 4, None]},
     ]
 
     xgbr_reg = XGBRegressor(learning_rate=0.05, n_threads=-1, random_state=42)
@@ -280,12 +305,12 @@ def main():
         print(feat)
 
     # Load and process test data
-    test_data = load_data('/kaggle/input/house-prices-advanced-regression-techniques/test.csv')
+    test_data = load_data('test.csv')
     test_data['YrSold_C'] = test_data['YrSold'].copy().astype(str).replace('nan', None)
     test_data['MoSold'] = test_data['MoSold'].astype(str).replace('nan', None)
     test_data['MSZoning'] = test_data['MSZoning'].astype(str).replace('nan', None)
     test_data['OverallCond_C'] = test_data['OverallCond'].copy().astype(str).replace('nan', None)
-    test_feat = process_data_pipeline(test_data, num_cols, cat_cols, cat_cols_categs, True)
+    test_feat = feat_union.transform(test_data)
 
     # Predict using the combination of Random Forest and XGBoost
     rf_predictions = final_rf_model.predict(test_feat)
