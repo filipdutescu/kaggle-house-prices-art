@@ -323,7 +323,7 @@ def main():
     pred_df['SalePrice'] = predictions.flatten()
 
     print(pred_df)
-    pred_df.to_csv('submission_rf_xgb.csv')
+    pred_df.to_csv('submission_rf_xgb.csv', index=False)
 
     # Predict using only the XGBoost model
     xgb_predictions = final_xgb_model.predict(test_feat)
@@ -334,7 +334,7 @@ def main():
     pred_df['SalePrice'] = predictions.flatten()
 
     print(pred_df)
-    pred_df.to_csv('submission_xgb.csv')
+    pred_df.to_csv('submission_xgb.csv', index=False)
 
     
 if __name__ == '__main__':
