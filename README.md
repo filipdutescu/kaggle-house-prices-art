@@ -1,7 +1,7 @@
 # Housing Prices Advanced Regression Techniques
 ## Kaggle Competition
 
-This repository contains my solution to the ***Housing Prices Advanced Regression Techniques Kaggle Competition***.
+This repository contains [my solution](https://www.kaggle.com/filipdutescu/housing-prices-advanced-regression-techniques) to the [***Housing Prices Advanced Regression Techniques Kaggle Competition***](https://www.kaggle.com/c/house-prices-advanced-regression-techniques).
 
 The source code can be found in the following:
   * **[Housing Prices Advanced Regression Techniques.ipynb](Housing%20Prices%20Advanced%20Regression%20Techniques.ipynb):** contains the a notebook with detailed explanations, as well as source code; the recommended file to read, since code-only can be harder to grasp
@@ -16,7 +16,7 @@ In order to properly run the code provided, one needs the following:
   * **Pandas 1.0.3**
   * **Matplotlib 3.2.1**
 
-> ***Note:** The notebook was made in Kaggle's engine, thus I cannot state any proper version to use.*
+> ***Note:** The notebook was made in Kaggle's engine, thus I cannot state any proper version to use. For the Kaggle notebook, please [click here](https://www.kaggle.com/filipdutescu/housing-prices-advanced-regression-techniques).*
 
 ## Author
   * **Filip-Ioan Dutescu** - [@filipdutescu](https://github.com/filipdutescu)
